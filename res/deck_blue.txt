@@ -21,8 +21,8 @@
 
 ("Flash"
 , 1
-, SpellCard [OnPlay [Choose [Not [AnyFriendly]] [Health Relative (-2)]]]),
+, SpellCard [OnPlay [Random [Not [AnyFriendly, Self]] [Health Relative (-2)]]]),
 
 ("Heal"
 , 1
-, SpellCard [OnPlay [Choose [AnyFriendly] [Health Absolute 2]]])]
+, SpellCard [OnPlay [Choose [AnyFriendly, Self] [Health Absolute 2]]])]

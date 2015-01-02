@@ -2,7 +2,9 @@ package Hearthstone
 
 import collection.mutable.ListBuffer
 
-case class Player(val name: String, var deck: Deck, var health: Int, var AP: Int) {
+sealed abstract class Creature(val name: String)
+
+case class Player(override val name: String, var deck: Deck, var health: Int, var AP: Int) extends Creature(name: String) {
   var field = ListBuffer[Card]()
   var hand = ListBuffer[Card]()
 
@@ -46,11 +48,8 @@ object MinionType extends Enumeration {
 
 import MinionType._
 
-case class Card(val cardType: String, val name: String, val cost: Int, val effects: ListBuffer[Effect],
-  val health: Int, val attack: Int, val taunt: Boolean, val minionType: MinionType) {
-  var currentHealth = health
-  var currentAttack = attack
-  var currentTaunt = taunt
+case class Card(val cardType: String, override val name: String, val cost: Int, val effects: ListBuffer[Effect],
+  var health: Int, var attack: Int, var taunt: Boolean, val minionType: MinionType) extends Creature(name: String) {
   var canAttack: Boolean = false
 
   def this(cardType: String, name: String, cost: Int, effects: ListBuffer[Effect]) {

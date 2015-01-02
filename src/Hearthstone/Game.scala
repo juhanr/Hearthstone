@@ -2,6 +2,9 @@ package Hearthstone
 
 import collection.mutable.ListBuffer
 import util.Random.shuffle
+import EffectTime._
+import EventEffectType._
+import FilterType._
 
 object Game extends App {
   val redDeckPath = "res/deck_red.txt"
@@ -147,6 +150,27 @@ object Game extends App {
     }
   }
 
+  def chooseCreature(creatures: ListBuffer[Creature], msg: String): Creature = {
+    println(msg)
+    var i = 1
+    for (creature <- creatures) {
+      println(i + ". " + creature.name)
+      i += 1
+    }
+    val input = readLine(inputPrefix).trim
+    if (input == "") return null
+    if (input.head.isDigit) {
+      val response = input.head.toString.toInt
+      if (response < 1 || response > creatures.length) {
+        println("Invalid input!")
+        return null
+      } else return creatures(response - 1)
+    } else {
+      println("Invalid input!")
+      return null
+    }
+  }
+
   /*
    * Tries to play the given card unto the field from the current player's hand.
    */
@@ -158,7 +182,8 @@ object Game extends App {
       currentPlayer.AP -= card.cost
       currentPlayer.hand -= card
       if (card.cardType == "MinionCard") currentPlayer.field += card
-      checkEffect(card)
+      checkEffects(card, EffectTime.OnPlay)
+      checkEffects(card, EffectTime.UntilDeath, "activate")
     }
   }
 
@@ -173,7 +198,7 @@ object Game extends App {
     if (card.canAttack == false) println("This card can't attack this turn!")
     else {
       if (otherPlayer.field.length == 0) {
-        otherPlayer.health -= card.currentAttack
+        otherPlayer.health -= card.attack
         println("You attacked " + otherPlayer.name + "!")
         if (otherPlayer.health <= 0) gameOver(currentPlayer)
         else print(" He has now " + otherPlayer.health + " HP remaining.")
@@ -183,12 +208,15 @@ object Game extends App {
         if (taunting.length > 0) attackables = taunting
         else attackables = otherPlayer.field
         val attackable = chooseCard(attackables, "Choose a card to attack: ")
-        attackable.currentHealth -= card.currentAttack
+        attackable.health -= card.attack
         println("You attacked " + attackable.name + "! ")
-        if (attackable.currentHealth <= 0) {
+        checkEffects(attackable, EffectTime.OnDamage)
+        if (attackable.health <= 0) {
           print("It was destroyed!")
+          checkEffects(card, EffectTime.OnDeath)
+          checkEffects(card, EffectTime.UntilDeath, "negate")
           otherPlayer.field -= attackable
-        } else print("It has " + attackable.currentHealth + " HP left.")
+        } else print("It has " + attackable.health + " HP left.")
       }
     }
   }
@@ -210,10 +238,76 @@ object Game extends App {
   }
 
   /*
-   * Checks the given card's effect.
+   * Checks the given card's effects and activates them as needed. (UntilDeath effect negating isn't implemented)
    */
-  def checkEffect(card: Card): Unit = {
+  def checkEffects(card: Card, time: EffectTime, untilDeathType: String = null): Unit = {
+    if (time != EffectTime.UntilDeath || untilDeathType != "negate")
+      for (effect <- card.effects)
+        if (effect.time == time)
+          for (eventEffect <- effect.eventEffects)
+            if (eventEffect.effectType == EventEffectType.DrawCard) drawCard
+            else {
+              var suitableCreatures = getSuitableCreatures(eventEffect.filters)
+              if (suitableCreatures.length > 0) {
+                eventEffect.effectType match {
+                  case EventEffectType.All =>
+                  case EventEffectType.Choose => {
+                    var chosenCreature: Creature = null
+                    while (chosenCreature == null)
+                      chosenCreature = chooseCreature(suitableCreatures,
+                        "Please choose to whom the effect should be applied to.")
+                    suitableCreatures = ListBuffer[Creature](chosenCreature)
+                  }
+                  case EventEffectType.Random => suitableCreatures = ListBuffer[Creature](shuffle(suitableCreatures).head)
+                }
+                for (creature <- suitableCreatures)
+                  for (creatureEffect <- eventEffect.creatureEffects)
+                    if (creatureEffect.effectType == CreatureEffectType.Taunt) {
+                      if (creature.isInstanceOf[Card]) {
+                        creature.asInstanceOf[Card].taunt = creatureEffect.tauntValue
+                        println(card.name + "'s effect has changed " + creature.name + "'s taunt.")
+                      }
+                    } else {
+                      var changeValue = creatureEffect.effectValue
+                      if (creatureEffect.changeType == ChangeType.Absolute) changeValue = Math.abs(changeValue)
+                      if (creatureEffect.effectType == CreatureEffectType.Health) {
+                        if (creature.isInstanceOf[Card]) creature.asInstanceOf[Card].health += changeValue
+                        else creature.asInstanceOf[Player].health += changeValue
+                        println(card.name + "'s effect has changed " + creature.name + "'s health.")
+                      } else if (creatureEffect.effectType == CreatureEffectType.Attack && creature.isInstanceOf[Card]) {
+                        creature.asInstanceOf[Card].attack += changeValue
+                        println(card.name + "'s effect has changed " + creature.name + "'s attack.")
+                      }
+                    }
+              }
+            }
+  }
 
+  /*
+   * Returns a list of creatures based on the given filters.
+   */
+  def getSuitableCreatures(filters: ListBuffer[Filter]): ListBuffer[Creature] = {
+    var suitableCreatures = ListBuffer[Creature]()
+    for (filter <- filters) {
+      filter.filterType match {
+        case FilterType.AnyCreature => suitableCreatures = suitableCreatures ++ currentPlayer.field ++ otherPlayer.field
+        case FilterType.AnyHero => suitableCreatures = suitableCreatures ++ ListBuffer[Creature](currentPlayer, otherPlayer)
+        case FilterType.AnyFriendly => suitableCreatures = suitableCreatures ++ currentPlayer.field
+        case FilterType.Type => suitableCreatures = suitableCreatures ++ (currentPlayer.field ++ otherPlayer.field).filter(_.minionType == filter.minionType)
+        case FilterType.Self => suitableCreatures += currentPlayer
+        case FilterType.Not => {
+          val notSuitableCreatures = getSuitableCreatures(filter.subFilters)
+          suitableCreatures = suitableCreatures ++
+            (currentPlayer.field ++ otherPlayer.field ++ ListBuffer[Creature](currentPlayer, otherPlayer)).filter(!notSuitableCreatures.contains(_))
+        }
+        case FilterType.Any => {
+          val suitableCreatures2 = getSuitableCreatures(filter.subFilters)
+          suitableCreatures = suitableCreatures ++ (currentPlayer.field ++ otherPlayer.field).filter(suitableCreatures2.contains(_))
+        }
+      }
+    }
+
+    return suitableCreatures
   }
 
   /*
