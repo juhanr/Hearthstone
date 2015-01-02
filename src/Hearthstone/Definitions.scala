@@ -9,13 +9,13 @@ case class Player(val name: String, var deck: Deck, var health: Int, var AP: Int
   def printStats: Unit = println("Health: " + health + "\nAction Points: " + AP)
 
   def printField: Unit = {
-    println("- " + name + " player's field -")
+    println("- " + name + "'s field -")
     if (field.length == 0) println("Empty")
     else for (card <- field) println(card.name)
   }
 
   def printHand: Unit = {
-    println("- " + name + " player's hand -")
+    println("- " + name + "'s hand -")
     if (hand.length == 0) println("Empty")
     else for (card <- hand) println(card.name)
   }
@@ -30,8 +30,6 @@ case class Deck {
     return result.stripSuffix(", ") + "]"
   }
 }
-
-sealed abstract class Card(val name: String, val cost: Int, val effects: ListBuffer[Effect])
 
 object MinionType extends Enumeration {
   type MinionType = Value
@@ -48,48 +46,24 @@ object MinionType extends Enumeration {
 
 import MinionType._
 
-case class MinionCard(override val name: String, override val cost: Int, val health: Int, val attack: Int,
-  val taunt: Boolean, val minionType: MinionType, override val effects: ListBuffer[Effect])
-  extends Card(name: String, cost: Int, effects: ListBuffer[Effect]) {
+case class Card(val cardType: String, val name: String, val cost: Int, val effects: ListBuffer[Effect],
+  val health: Int, val attack: Int, val taunt: Boolean, val minionType: MinionType) {
   var currentHealth = health
   var currentAttack = attack
   var currentTaunt = taunt
+  var canAttack: Boolean = false
 
-  override def toString: String = {
-    var result = "MinionCard: {"
-    val keys = List[String]("Name", "Cost", "Health", "Attack", "Taunt", "MinionType", "Effects")
-    val values = this.productIterator.toList
-    for (attributes <- keys zip values) {
-      if (attributes._1 == "Effects") {
-        result += attributes._1 + ": ["
-        for (effect <- effects) {
-          result += effect + ", "
-        }
-        result = result.stripSuffix(", ") + "]"
-      } else result += attributes._1 + ": " + attributes._2 + ", "
-    }
-    return result.stripSuffix(", ") + "}"
+  def this(cardType: String, name: String, cost: Int, effects: ListBuffer[Effect]) {
+    this(cardType, name, cost, effects, 0, 0, false, null)
   }
-}
-
-case class SpellCard(override val name: String, override val cost: Int, override val effects: ListBuffer[Effect])
-  extends Card(name: String, cost: Int, effects: ListBuffer[Effect]) {
 
   override def toString: String = {
-    var result = "SpellCard: {"
-    val keys = List[String]("Name", "Cost", "Effects")
-    val values = this.productIterator.toList
-    val spacing = "    "
-    for (attributes <- keys zip values) {
-      if (attributes._1 == "Effects") {
-        result += attributes._1 + ": ["
-        for (effect <- effects) {
-          result += effect + ", "
-        }
-        result = result.stripSuffix(", ") + "]"
-      } else result += attributes._1 + ": " + attributes._2 + ", "
-    }
-    return result.stripSuffix(", ") + "}"
+    var result = "Card: {Type: " + cardType + ", Name: " + name + ", Cost: " + cost + ", Effects: ["
+    for (effect <- effects) result += effect + ", "
+    result = result.stripSuffix(", ") + "]"
+    if (cardType == "MinionCard")
+      result += ", Health: " + health + ", Attack: " + attack + ", Taunt: " + taunt + ", MinionType: " + minionType
+    return result + "}"
   }
 }
 
@@ -121,7 +95,7 @@ case class Effect(val time: EffectTime) {
       result += eventEffect + ", "
     }
     result = result.stripSuffix(", ") + "]"
-    return result.stripSuffix(", ") + "}"
+    return result + "}"
   }
 }
 
@@ -137,7 +111,7 @@ object EventEffectType extends Enumeration {
     case "Choose" => Choose
     case "Random" => Random
     case "DrawCard" => DrawCard
-    case _ => throw new Parser.ParseErrorException()
+    case _ => println(arg); throw new Parser.ParseErrorException()
   }
 }
 
@@ -162,7 +136,7 @@ case class EventEffect(val effectType: EventEffectType) {
       }
       result = result.stripSuffix(", ") + "]"
     }
-    return result.stripSuffix(", ") + "}"
+    return result + "}"
   }
 }
 
@@ -211,7 +185,7 @@ case class CreatureEffect(val effectType: CreatureEffectType, val changeType: Ch
     } else {
       result += "ChangeType: " + changeType + ", EffectValue: " + effectValue
     }
-    return result.stripSuffix(", ") + "}"
+    return result + "}"
   }
 }
 
@@ -246,7 +220,7 @@ case class Filter(val filterType: FilterType) {
   override def toString: String = {
     var result = "Filter: {FilterType: " + filterType + ", "
     if (filterType == FilterType.Type) {
-      result += "MinionType: " + minionType + ", "
+      result += "MinionType: " + minionType
     } else if (filterType == FilterType.Any || filterType == FilterType.Not) {
       result += "SubFilters: ["
       for (subfilter <- subFilters) {
@@ -254,6 +228,6 @@ case class Filter(val filterType: FilterType) {
       }
       result = result.stripSuffix(", ") + "]"
     }
-    return result.stripSuffix(", ") + "}"
+    return result + "}"
   }
 }

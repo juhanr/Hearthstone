@@ -1,6 +1,6 @@
 [ ("Boulderfist Ogre"
 , 6
-, MinionCard [OnPlay [Choose [Any [AnyCreature, AnyHero], Not [Any[Self], Type Beast]] [Health Relative (-1), Taunt True], DrawCard]
+, MinionCard [OnPlay [Choose [Any [AnyCreature, AnyHero], Not [Any [Self], Type Beast]] [Health Relative (-1), Taunt True], DrawCard]
 , OnDeath [DrawCard]] 6 7 False Beast),
 
 ("Elven Archer"
@@ -13,4 +13,16 @@
 
 ("Minotaur"
 , 7
-, MinionCard [OnPlay [DrawCard]] 2 4 False Nothing)]
+, MinionCard [] 4 4 True Beast),
+
+("Shlur"
+, 2
+, MinionCard [] 1 2 False Murloc),
+
+("Flash"
+, 1
+, SpellCard [OnPlay [Choose [Not [AnyFriendly]] [Health Relative (-2)]]]),
+
+("Heal"
+, 1
+, SpellCard [OnPlay [Choose [AnyFriendly] [Health Absolute 2]]])]
