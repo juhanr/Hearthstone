@@ -15,6 +15,9 @@ object Parser {
     return content
   }
 
+  /*
+   * Parses the given deck string and returns the according deck object.
+   */
   def parseDeck(deckString: String): Deck = {
     val cards = deckString.split("\\),[\n\r]").map(stripBrackets(_, 2))
     var deck = new Deck
@@ -22,22 +25,28 @@ object Parser {
     return deck
   }
 
+  /*
+   * Parses the given card string and returns the according card object.
+   */
   def parseCard(cardString: String): Card = {
-    val cardAttributes = findElements(cardString)
-    val cardAttributes2 = findElements(cardAttributes(2).stripPrefix(",").trim, ' ')
+    var cardAttributes = findElements(cardString)
+    cardAttributes = cardAttributes.take(2) ++ findElements(cardAttributes(2).stripPrefix(",").trim, ' ')
 
-    val effectStrings = findElements(stripBrackets(cardAttributes2(1)))
+    val effectStrings = findElements(stripBrackets(cardAttributes(3)))
     var effects = ListBuffer[Effect]()
     effectStrings.foreach(effects += parseEffect(_))
 
-    if (cardAttributes2(0) == "MinionCard") {
-      new Card("MinionCard", cardAttributes(0).replace("\"", ""), cardAttributes(1).toInt, effects, cardAttributes2(2).toInt, cardAttributes2(3).toInt,
-        cardAttributes2(4).toBoolean, MinionType.valueOf(cardAttributes2(5)))
-    } else if (cardAttributes2(0) == "SpellCard") {
+    if (cardAttributes(2) == "MinionCard") {
+      new Card("MinionCard", cardAttributes(0).replace("\"", ""), cardAttributes(1).toInt, effects, cardAttributes(4).toInt,
+        cardAttributes(5).toInt, cardAttributes(6).toBoolean, MinionType.valueOf(cardAttributes(7)))
+    } else if (cardAttributes(2) == "SpellCard") {
       new Card("SpellCard", cardAttributes(0).replace("\"", ""), cardAttributes(1).toInt, effects)
     } else throw new ParseErrorException()
   }
 
+  /*
+   * Parses the given effect string and returns the according effect object.
+   */
   def parseEffect(effectString: String): Effect = {
     val effectAttributes = findElements(effectString, ' ')
     var effect = new Effect(EffectTime.valueOf(effectAttributes(0)))
@@ -46,6 +55,9 @@ object Parser {
     return effect
   }
 
+  /*
+   * Parses the given event effect string and returns the according event effect object.
+   */
   def parseEventEffect(effectString: String): EventEffect = {
     if (effectString == EventEffectType.DrawCard.toString) {
       return new EventEffect(EventEffectType.DrawCard)
@@ -63,6 +75,9 @@ object Parser {
     }
   }
 
+  /*
+   * Parses the given filter string and returns the according filter object.
+   */
   def parseFilter(filterString: String): Filter = {
     val filterAttributes = findElements(filterString, ' ')
     val filterType = FilterType.valueOf(filterAttributes(0))
@@ -75,6 +90,9 @@ object Parser {
     return filter
   }
 
+  /*
+   * Parses the given creature effect string and returns the according creature effect object.
+   */
   def parseCreatureEffect(effectString: String): CreatureEffect = {
     val effectAttributes = effectString.split(" ")
     if (effectAttributes(0) == CreatureEffectType.Taunt.toString)
@@ -84,6 +102,9 @@ object Parser {
         ChangeType.valueOf(effectAttributes(1)), stripBrackets(effectAttributes(2)).toInt)
   }
 
+  /*
+   * Strips the given amount of brackets from both sides of the given string.
+   */
   def stripBrackets(str: String, amount: Int = 1): String = {
     var returnStr = str.trim
     if ("[(".contains(returnStr.head)) returnStr = returnStr.drop(1)
@@ -93,37 +114,44 @@ object Parser {
   }
 
   /*
-   * Returns a list of elements strings, which
-   * are extracted from the given list string.
+   * Returns a list of elements strings, which are extracted from the given list string.
    */
-  def findElements(str: String, deliminator: Char = ','): ListBuffer[String] = {
+  def findElements(string: String, delimiter: Char = ','): ListBuffer[String] = {
     var elements = ListBuffer[String]()
-    if (str != "") {
-      var indexes = ListBuffer[Int](0)
-      var depth = 0
-      var char = ' '
-      for (i <- 0 to str.length - 1) {
-        char = str(i)
-        if (depth == 0 && char == deliminator) indexes += i
-        else if (char == '[') depth += 1
-        else if (char == ']') depth -= 1
-      }
-      indexes += str.length - 1
+    if (string != "") {
+      var delimiterIndexes = findDelimiterIndexes(string, delimiter)
 
-      val lastIndex = indexes.length - 1
+      val lastIndex = delimiterIndexes.length - 1
       for (i <- 0 to lastIndex) {
-        val lastTwo = str.takeRight(2)
-        if (i != lastIndex)
-          elements += str.substring(indexes(i), indexes(i + 1)).stripPrefix(",").trim
-        else if (lastTwo(0) == ' ')
-          elements(elements.length - 1) = elements.last + lastTwo
-        else
-          elements(elements.length - 1) = elements.last + lastTwo(1)
+        val lastTwoChars = string.takeRight(2)
+        if (i != lastIndex) elements += string.substring(delimiterIndexes(i), delimiterIndexes(i + 1)).stripPrefix(",").trim
+        else if (lastTwoChars(0) == ' ') elements(elements.length - 1) = elements.last + lastTwoChars
+        else elements(elements.length - 1) = elements.last + lastTwoChars(1)
       }
     }
     return elements
   }
 
+  /*
+   * Returns a list of indexes of the given delimiter of the given string.
+   */
+  def findDelimiterIndexes(string: String, delimiter: Char): ListBuffer[Int] = {
+    var indexes = ListBuffer[Int](0)
+    var depth = 0
+    var char = ' '
+    for (i <- 0 to string.length - 1) {
+      char = string(i)
+      if (depth == 0 && char == delimiter) indexes += i
+      else if (char == '[') depth += 1
+      else if (char == ']') depth -= 1
+    }
+    indexes += string.length - 1
+    return indexes
+  }
+
+  /*
+   * Exception class for parse errors.
+   */
   class ParseErrorException extends java.lang.RuntimeException {
     def this(msg: String) = {
       this()
